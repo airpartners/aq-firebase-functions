@@ -33,33 +33,6 @@ exports.writeDB = functions.https.onRequest((request, response) => {
 
 const fetch = require('node-fetch');
 
-const base64 = require('base-64');
-const BASE_URL = "https://quant-aq.com/device-api/v1/devices";
-const LIMIT = 20;
-const USERNAME = process.env.QUANTAQ_APIKEY;
-const PASSWORD = "";
-const token = 'Basic ' + base64.encode(USERNAME + ":" + PASSWORD);
-
-function getEndpoint(deviceId = 'SN000-072', page = 1, perPage = 2) {
-  return `${BASE_URL}/${deviceId}/data/?page=${page}&per_page=${perPage}&limit=${LIMIT}`;
-}
-
-exports.fetchQuantAQ = functions.https.onRequest((request, response) => {
-  console.log("Hello console! I'm trying to fetch data from QuantAQ...");
-  fetch(getEndpoint(), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': token,
-    },
-    credentials: 'include',
-    method: 'GET'
-  }).then(res => res.json())
-    .then(data => console.log(data))
-    .catch(error => console.log(error));
-  response.send("Fetch is running asynchronously! The data will be printed to the console when it's done.");
-})
-
 /**
  * TODO(developer): Uncomment these variables before running the sample.
  */
@@ -84,6 +57,55 @@ async function accessSecretVersion() {
   // snippet is showing how to access the secret material.
   console.info(`Payload: ${payload}`);
 }
+
+const base64 = require('base-64');
+const BASE_URL = "https://quant-aq.com/device-api/v1/devices";
+const LIMIT = 20;
+var completeToken = "";
+const PASSWORD = "";
+// var token = "";
+
+async function getToken() {
+  const [version] = await client.accessSecretVersion({
+    name: name,
+  });
+  const token = version.payload.data.toString();
+  completeToken = 'Basic ' + base64.encode(token + ":" + PASSWORD);
+  return completeToken;
+}
+
+async function writeDataToDB(data) {
+  // this should be updated once we have organization based on devices
+  console.log("restructuring data and writing to DB");
+  const resultLength = data['meta']['per_page'];
+  var jsonObject = {};
+  for (i = 0; i < resultLength; i++) {
+    var key = data['data'][i]['timestamp'];
+    var value = data['data'][i];
+    jsonObject[key] = value;
+  }
+  admin.database().ref(data['data'][0]['sn']).set(jsonObject);
+}
+
+function getEndpoint(deviceId = 'SN000-072', page = 1, perPage = 2) {
+  return `${BASE_URL}/${deviceId}/data/?page=${page}&per_page=${perPage}&limit=${LIMIT}`;
+}
+
+exports.fetchQuantAQ = functions.https.onRequest((request, response) => {
+  getToken().then(result => fetch(getEndpoint(), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': result,
+    },
+    credentials: 'include',
+    method: 'GET'
+  })).then(res => res.json())
+    .then(data => writeDataToDB(data))
+    .catch(error => console.log(error));
+  response.send("Fetch is running asynchronously! The data will be printed to the console when it's done.");
+} )
+
 
 exports.accessSecret = functions.https.onRequest((request, response) => {
   console.log("Hello console! I'm trying to access a secret...");
