@@ -63,7 +63,6 @@ const BASE_URL = "https://quant-aq.com/device-api/v1/devices";
 const LIMIT = 20;
 var completeToken = "";
 const PASSWORD = "";
-// var token = "";
 
 async function getToken() {
   const [version] = await client.accessSecretVersion({
@@ -75,16 +74,14 @@ async function getToken() {
 }
 
 async function writeDataToDB(data) {
-  // this should be updated once we have organization based on devices
   console.log("restructuring data and writing to DB");
   const resultLength = data['meta']['per_page'];
-  var jsonObject = {};
+  const sn = data['data'][0]['sn'];
+  var snRef = admin.database().ref(sn);
+  snRef.child('latest').set(data['data'][0]);
   for (i = 0; i < resultLength; i++) {
-    var key = data['data'][i]['timestamp'];
-    var value = data['data'][i];
-    jsonObject[key] = value;
+    snRef.child('/data/'+data['data'][i]['timestamp']).set(data['data'][i]);
   }
-  admin.database().ref(data['data'][0]['sn']).set(jsonObject);
 }
 
 function getEndpoint(deviceId = 'SN000-072', page = 1, perPage = 2) {
@@ -92,7 +89,7 @@ function getEndpoint(deviceId = 'SN000-072', page = 1, perPage = 2) {
 }
 
 exports.fetchQuantAQ = functions.https.onRequest((request, response) => {
-  getToken().then(result => fetch(getEndpoint(), {
+  getToken().then(result => fetch(getEndpoint('SN000-088', 1, 10), {
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -106,6 +103,11 @@ exports.fetchQuantAQ = functions.https.onRequest((request, response) => {
   response.send("Fetch is running asynchronously! The data will be printed to the console when it's done.");
 } )
 
+exports.clearQuantAQ = functions.https.onRequest((request, response) => {
+  console.log("Clearing data from SN000-088");
+  admin.database().ref('SN000-088').set(null);
+  response.send("Running asynchronously! Data will be cleared when it is done.")
+})
 
 exports.accessSecret = functions.https.onRequest((request, response) => {
   console.log("Hello console! I'm trying to access a secret...");
