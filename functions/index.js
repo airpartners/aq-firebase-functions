@@ -7,8 +7,8 @@ const base64 = require('base-64');
 admin.initializeApp();
 
 // Secret manager setup
-const client = new SecretManagerServiceClient();
-const secretURI = 'projects/airpartners-ade/secrets/QUANTAQ_APIKEY/versions/latest';
+const secretManagerServiceClient = new SecretManagerServiceClient();
+const SECRET_URI = 'projects/airpartners-ade/secrets/QUANTAQ_APIKEY/versions/latest';
 
 // Quant-AQ request parameters
 const BASE_URL = "https://quant-aq.com/device-api/v1/devices";
@@ -17,7 +17,10 @@ var completeToken = "";
 const PASSWORD = ""; // no password required for now
 
 // This needs to be updated when EB devices go live
-const device_list = ['SN000-088', 'SN000-062', 'SN000-067', 'SN000-089', 'SN000-094', 'SN000-075'];
+const DEVICE_LIST = ['SN000-088', 'SN000-062', 'SN000-067', 'SN000-089', 'SN000-094', 'SN000-075'];
+const GRAPH_NODE_KEYS = ['co', 'no2', 'o3', 'pm25', 'sn', 'timestamp', 'timestamp_local'];
+const LATEST_NODE_KEYS = ['co', 'no2', 'o3', 'pm25', 'rh_manifold', 'temp_manifold',
+  'wind_dir', 'wind_speed', 'geo', 'sn', 'timestamp', 'timestamp_local'];
 
 
 /*************** HELPER FUNCS ***********************/
@@ -25,8 +28,8 @@ const device_list = ['SN000-088', 'SN000-062', 'SN000-067', 'SN000-089', 'SN000-
  * Return encoded Quant-AQ API key stored with Google Secret Manager
  */
 async function getToken() {
-  const [version] = await client.accessSecretVersion({
-    name: secretURI,
+  const [version] = await secretManagerServiceClient.accessSecretVersion({
+    name: SECRET_URI,
   });
   const token = version.payload.data.toString();
   completeToken = 'Basic ' + base64.encode(token + ":" + PASSWORD);
@@ -37,12 +40,11 @@ async function getToken() {
  * Return new data point without unused nodes
  *
  * @param {object} dataPoint the data point to be cleaned of unused data
+ * @param {array} keysToKeep the keys for the nodes to keep in dataPoint
  */
-function removeUnusedData(dataPoint) {
-  const dataNodesToKeep = ['co', 'no2', 'o3', 'pm25', 'rh_manifold', 'temp_manifold',
-    'wind_dir', 'wind_speed', 'geo', 'sn', 'timestamp', 'timestamp_local'];
+function removeUnusedData(dataPoint, keysToKeep) {
   newDataPoint = {};
-  for (key of dataNodesToKeep) {
+  for (key of keysToKeep) {
     if (typeof dataPoint[key] !== 'undefined') {
       newDataPoint[key] = dataPoint[key];
     }
@@ -64,6 +66,17 @@ function fixNegativePollutantConcentrations(dataPoint) {
 }
 
 /**
+ * Reduces lat/long specificity to 3 decimal places
+ *
+ * @param {object} dataPoint the data point to be fixed
+ */
+function trimGeoData(dataPoint) {
+  dataPoint.geo.lat = parseFloat(Number(dataPoint.geo.lat).toFixed(3));
+  dataPoint.geo.lon = parseFloat(Number(dataPoint.geo.lon).toFixed(3));
+  return dataPoint;
+}
+
+/**
  * Write data to the Firebase Realtime Database
  *
  * @param {object} data contains a meta node with information about the request
@@ -75,10 +88,11 @@ async function writeDataToDB(data) {
   const sn = data['data'][0]['sn'];
   var snRef = admin.database().ref(sn);
   console.log(`restructuring data for ${sn} and writing to DB`);
-  let latestDataPoint = fixNegativePollutantConcentrations(removeUnusedData(data['data'][0]));
+  let latestDataPoint = trimGeoData(fixNegativePollutantConcentrations(removeUnusedData(data['data'][0], LATEST_NODE_KEYS)));
   snRef.child('latest').set(latestDataPoint);
   for (i = 0; i < resultLength; i++) {
-    snRef.child('/data/' + data['data'][i]['timestamp']).set(data['data'][i]);
+    let dataPoint = trimGeoData(data['data'][i]);
+    snRef.child('/data/' + data['data'][i]['timestamp']).set(dataPoint);
   }
 }
 
@@ -139,12 +153,18 @@ function buildNewGraph(currentGraph, latestDataPoint) {
   currentGraph.forEach(dataPoint => {
     date = new Date(dataPoint.timestamp);
     if ((latestDate - date) <= threshold) {
-      newGraph.push(dataPoint);
+      newGraph.push(removeUnusedData(dataPoint, GRAPH_NODE_KEYS));
     }
   });
   return newGraph;
 }
 
+/**
+ * Return true if dateStringLatest is more than 15 minutes later than dateStringHead
+ *
+ * @param {string} dateStringHead timestamp in ISO date-time format
+ * @param {string} dateStringLatest timestamp in ISO date-time format
+ */
 function enoughTimePassed(dateStringHead, dateStringLatest) {
   const headTime = new Date(dateStringHead);
   const latestTime = new Date(dateStringLatest);
@@ -157,21 +177,13 @@ function enoughTimePassed(dateStringHead, dateStringLatest) {
  * Updates the graph node for the given sn if a new latest point exists
  *
  * @param {string} sn the serial number of the device to be updated
- * @param {boolean} debug true to enable verbose console output
  */
-async function updateGraphNode(sn, debug = false) {
-  if (debug) {
-    console.log(`${sn}: Attempting to update graph node...`);
-    console.log(`${sn}: Checking if latest node exists...`);
-  }
+async function updateGraphNode(sn) {
   const latest = await getValueFromDatabaseByRef(`${sn}/latest`);
   if (latest) {
-    if (debug) { console.log(`${sn}: Latest node exists. Checking if graph node exists...`); }
     const graph = await getValueFromDatabaseByRef(`${sn}/graph`);
     if (Array.isArray(graph)) {
-      if (debug) { console.log(`${sn}: Graph node exists.`); }
       if (enoughTimePassed(graph[0].timestamp, latest.timestamp)) {
-        if (debug) { console.log(`${sn}: Updating graph node with new data point. Removing old data points...`); }
         const newGraph = buildNewGraph(graph, latest);
         admin.database().ref(sn).update({
           "graph": newGraph
@@ -181,9 +193,8 @@ async function updateGraphNode(sn, debug = false) {
         console.log(`${sn}: A data point within 15 minutes of the latest timestamp already exists.`);
       }
     } else {
-      if (debug) { console.log(`${sn}: Graph node doesn't exist. Creating one now with the latest data point...`); }
       admin.database().ref(sn).update({
-        "graph": [latest]
+        "graph": [removeUnusedData(latest, GRAPH_NODE_KEYS)]
       }).then(console.log(`${sn}: Done creating graph node.`))
         .catch(err => console.log(err));
     }
@@ -195,12 +206,12 @@ async function updateGraphNode(sn, debug = false) {
 
 /*************** FIREBASE CLOUD FUNCTIONS ***********************/
 /**
- * This function iterates through each serial number in device_list and updates
+ * This function iterates through each serial number in DEVICE_LIST and updates
  * its data in the Firebase Realtime Database with the most recent data from
  * Quant-AQ. This function can be manually triggered through its https endpoint.
  */
 exports.fetchQuantAQ = functions.https.onRequest((request, response) => {
-  for (sn of device_list) {
+  for (sn of DEVICE_LIST) {
     getDataAndWriteToDB(sn);
   }
   response.send("Fetch is running asynchronously! The data will be in the database when it's done.");
@@ -211,19 +222,19 @@ exports.fetchQuantAQ = functions.https.onRequest((request, response) => {
  */
 exports.fetchQuantAQScheduled = functions.pubsub.schedule('every 10 minutes').onRun((context) => {
   console.log("Fetching data from QuantAQ and writing to DB");
-  for (sn of device_list) {
+  for (sn of DEVICE_LIST) {
     getDataAndWriteToDB(sn);
   }
   return null;
 })
 
 /**
- * This function iterates through each serial number in device_list and clears its old
+ * This function iterates through each serial number in DEVICE_LIST and clears its old
  * data from the Firebase Realtime Database. This function can be manually triggered
  * through its https endpoint.
  */
 exports.clearQuantAQ = functions.https.onRequest((request, response) => {
-  for (sn of device_list) {
+  for (sn of DEVICE_LIST) {
     console.log(`Clearing data from ${sn}`);
     admin.database().ref(sn).child('data').set(null);
   }
@@ -234,7 +245,7 @@ exports.clearQuantAQ = functions.https.onRequest((request, response) => {
  * A scheduled version of clearQuantAQ() which runs every 24 hours.
  */
 exports.clearQuantAQScheduled = functions.pubsub.schedule('every 24 hours').onRun((context) => {
-  for (sn of device_list) {
+  for (sn of DEVICE_LIST) {
     console.log(`Clearing data from ${sn}`);
     admin.database().ref(sn).child('data').set(null);
   }
@@ -242,13 +253,13 @@ exports.clearQuantAQScheduled = functions.pubsub.schedule('every 24 hours').onRu
 })
 
 /**
- * This function iterates through each serial number in device_list and updates
+ * This function iterates through each serial number in DEVICE_LIST and updates
  * its graph node in the Firebase Realtime Database with the data point stored in its
  * latest node. It also removes any old data points in the graph node. This function
  * can be manually triggered through its https endpoint.
  */
 exports.updateGraphNodes = functions.https.onRequest((request, response) => {
-  for (sn of device_list) {
+  for (sn of DEVICE_LIST) {
     updateGraphNode(sn);
   }
   response.send("Graph nodes updating asynchronously. See logs for progress.");
