@@ -145,6 +145,14 @@ function buildNewGraph(currentGraph, latestDataPoint) {
   return newGraph;
 }
 
+function enoughTimePassed(dateStringHead, dateStringLatest) {
+  const headTime = new Date(dateStringHead);
+  const latestTime = new Date(dateStringLatest);
+  const timeDiff = latestTime - headTime;
+  const threshold = 1000 * 60 * 15; // 15 minutes in milliseconds
+  return timeDiff >= threshold;
+}
+
 /**
  * Updates the graph node for the given sn if a new latest point exists
  *
@@ -160,9 +168,9 @@ async function updateGraphNode(sn, debug = false) {
   if (latest) {
     if (debug) { console.log(`${sn}: Latest node exists. Checking if graph node exists...`); }
     const graph = await getValueFromDatabaseByRef(`${sn}/graph`);
-    if (graph) {
+    if (Array.isArray(graph)) {
       if (debug) { console.log(`${sn}: Graph node exists.`); }
-      if (graph[0].timestamp !== latest.timestamp) {
+      if (enoughTimePassed(graph[0].timestamp, latest.timestamp)) {
         if (debug) { console.log(`${sn}: Updating graph node with new data point. Removing old data points...`); }
         const newGraph = buildNewGraph(graph, latest);
         admin.database().ref(sn).update({
@@ -170,7 +178,7 @@ async function updateGraphNode(sn, debug = false) {
         }).then(console.log(`${sn}: Done updating graph node.`))
           .catch(err => console.log(err));
       } else {
-        console.log(`${sn}: The latest data point already exists in the graph node.`);
+        console.log(`${sn}: A data point within 15 minutes of the latest timestamp already exists.`);
       }
     } else {
       if (debug) { console.log(`${sn}: Graph node doesn't exist. Creating one now with the latest data point...`); }
@@ -247,11 +255,11 @@ exports.updateGraphNodes = functions.https.onRequest((request, response) => {
 })
 
 /**
- * A scheduled version of updateGraphNodes() which runs once every hour.
+ * Listen to updates to the latest field of each device and trigger updatedGraphNode()
  */
-exports.updateGraphNodesScheduled = functions.pubsub.schedule('every 1 hours').onRun((context) => {
-  for (sn of device_list) {
-    updateGraphNode(sn);
-  }
-  return null;
-})
+exports.updateGraphNodeListener = functions.database.ref('{sn}/latest')
+  .onUpdate((change, context) => {
+    const snapshot = change.after;
+    const sn = context.params.sn;
+    return updateGraphNode(sn);
+  })
