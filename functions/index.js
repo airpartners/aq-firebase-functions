@@ -51,6 +51,19 @@ function removeUnusedData(dataPoint) {
 }
 
 /**
+ * Rounds any negative pollutant concentrations up to 0
+ *
+ * @param {object} dataPoint the data point to be fixed
+ */
+function fixNegativePollutantConcentrations(dataPoint) {
+  const pollutantKeys = ['co', 'no2', 'o3', 'pm25'];
+  for (key of pollutantKeys) {
+    dataPoint[key] = (dataPoint[key] < 0) ? 0 : dataPoint[key];
+  }
+  return dataPoint;
+}
+
+/**
  * Write data to the Firebase Realtime Database
  *
  * @param {object} data contains a meta node with information about the request
@@ -62,7 +75,8 @@ async function writeDataToDB(data) {
   const sn = data['data'][0]['sn'];
   var snRef = admin.database().ref(sn);
   console.log(`restructuring data for ${sn} and writing to DB`);
-  snRef.child('latest').set(removeUnusedData(data['data'][0]));
+  let latestDataPoint = fixNegativePollutantConcentrations(removeUnusedData(data['data'][0]));
+  snRef.child('latest').set(latestDataPoint);
   for (i = 0; i < resultLength; i++) {
     snRef.child('/data/' + data['data'][i]['timestamp']).set(data['data'][i]);
   }
