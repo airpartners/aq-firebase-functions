@@ -18,8 +18,9 @@ const PASSWORD = ""; // no password required for now
 
 // This needs to be updated when EB devices go live
 const DEVICE_LIST = ['SN000-088', 'SN000-062', 'SN000-067', 'SN000-089', 'SN000-094', 'SN000-075'];
-const GRAPH_NODE_KEYS = ['co', 'no2', 'o3', 'pm25', 'sn', 'timestamp', 'timestamp_local'];
-const LATEST_NODE_KEYS = ['co', 'no2', 'o3', 'pm25', 'rh_manifold', 'temp_manifold',
+const POLLUTANT_KEYS = ['co', 'no2', 'o3', 'pm25', 'no']; // to check for negative values
+const GRAPH_NODE_KEYS = ['co', 'no', 'no2', 'o3', 'pm25', 'sn', 'timestamp', 'timestamp_local'];
+const LATEST_NODE_KEYS = ['co', 'no', 'no2', 'o3', 'pm25', 'rh_manifold', 'temp_manifold',
   'wind_dir', 'wind_speed', 'geo', 'sn', 'timestamp', 'timestamp_local'];
 
 
@@ -58,8 +59,7 @@ function removeUnusedData(dataPoint, keysToKeep) {
  * @param {object} dataPoint the data point to be fixed
  */
 function fixNegativePollutantConcentrations(dataPoint) {
-  const pollutantKeys = ['co', 'no2', 'o3', 'pm25'];
-  for (key of pollutantKeys) {
+  for (key of POLLUTANT_KEYS) {
     dataPoint[key] = (dataPoint[key] < 0) ? 0 : dataPoint[key];
   }
   return dataPoint;
