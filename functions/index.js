@@ -17,7 +17,7 @@ var completeToken = "";
 const PASSWORD = ""; // no password required for now
 
 // This needs to be updated when EB devices go live
-const DEVICE_LIST = ['SN000-088', 'SN000-062', 'SN000-067', 'SN000-089', 'SN000-094', 'SN000-075'];
+const DEVICE_LIST = ['SN000-045', 'SN000-046', 'SN000-049', 'SN000-062', 'SN000-067', 'SN000-072'];
 const POLLUTANT_KEYS = ['co', 'no2', 'o3', 'pm25', 'no']; // to check for negative values
 const GRAPH_NODE_KEYS = ['co', 'no', 'no2', 'o3', 'pm25', 'sn', 'timestamp', 'timestamp_local'];
 const LATEST_NODE_KEYS = ['co', 'no', 'no2', 'o3', 'pm25', 'rh_manifold', 'temp_manifold',
