@@ -153,7 +153,7 @@ describe('Helper functions', () => {
           }
         };
         const expectedResult = {
-          test: 1,
+          test: 2,
           test4: {
             four: 4,
             five: 5
