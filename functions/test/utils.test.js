@@ -45,6 +45,7 @@ describe('Helper functions', () => {
           utils.getToken(secretURI).then((res) => {
             assert.equal(res, expectedResult);
             done();
+            return null;
           }).catch(e => done(e));
         });
       });
@@ -106,11 +107,11 @@ describe('Helper functions', () => {
             }
           };
 
-          utils.writeDataToDB(data).then(() => {
-            admin.database().ref('SN-00TEST/latest').once('value').then(snap => {
-              assert.deepEqual(snap.val(), expectedResultLatest);
-              done();
-            }).catch(e => done(e));
+          utils.writeDataToDB(data).then(async () => {
+            const snap = await admin.database().ref('SN-00TEST/latest').once('value');
+            assert.deepEqual(snap.val(), expectedResultLatest);
+            done();
+            return null;
           }).catch(e => done(e));
         });
       });
@@ -131,6 +132,7 @@ describe('Helper functions', () => {
           utils.getValueFromDatabaseByRef(refString).then((res) => {
             assert.equal(res, val);
             done();
+            return null;
           }).catch(e => done(e));
         });
       });
