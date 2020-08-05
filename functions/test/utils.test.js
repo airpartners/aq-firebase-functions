@@ -130,9 +130,8 @@ describe('Helper functions', () => {
 
         it('should get value at the specified ref from the test db', (done) => {
           utils.getValueFromDatabaseByRef(refString).then((res) => {
-            assert.equal(res, val);
+            assert.equal(res, 1);
             done();
-            return null;
           }).catch(e => done(e));
         });
       });
