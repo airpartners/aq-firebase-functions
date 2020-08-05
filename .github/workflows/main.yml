@@ -21,6 +21,7 @@ jobs:
         run: npm test
   deploy:
     name: Deploy
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
