@@ -132,7 +132,6 @@ describe('Helper functions', () => {
           utils.getValueFromDatabaseByRef(refString).then((res) => {
             assert.equal(res, val);
             done();
-            return null;
           }).catch(e => done(e));
         });
       });
@@ -153,7 +152,7 @@ describe('Helper functions', () => {
           }
         };
         const expectedResult = {
-          test: 1,
+          test: 2,
           test4: {
             four: 4,
             five: 5
