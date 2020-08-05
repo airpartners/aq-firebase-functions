@@ -132,6 +132,7 @@ describe('Helper functions', () => {
           utils.getValueFromDatabaseByRef(refString).then((res) => {
             assert.equal(res, 1);
             done();
+            return null;
           }).catch(e => done(e));
         });
       });
