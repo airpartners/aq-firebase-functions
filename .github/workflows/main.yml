@@ -2,7 +2,6 @@ name: Firebase Deploy
 on:
   push:
     paths-ignore:
-      - '.github/**'
       - 'README.md'
     branches:
       - master

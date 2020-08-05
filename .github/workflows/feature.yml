@@ -1,11 +1,8 @@
 name: Test feature
 on:
-  pull_request:
-    paths-ignore:
-      - '.github/**'
-      - 'README.md'
+  push:
     branches-ignore:
-      # will trigger on pull request events for any branch except master
+      # will trigger on push events for any branch except master
       - master
 
 jobs:
