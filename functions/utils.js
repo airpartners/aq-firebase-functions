@@ -179,8 +179,7 @@ enoughTimePassed = (dateStringHead, dateStringLatest) => {
   const latestTime = new Date(dateStringLatest);
   const timeDiff = latestTime - headTime;
   const threshold = 1000 * 60 * 15; // 15 minutes in milliseconds
-  // return timeDiff >= threshold;
-  return false;
+  return timeDiff >= threshold;
 }
 exports.enoughTimePassed = enoughTimePassed;
 
