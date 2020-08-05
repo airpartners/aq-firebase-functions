@@ -1,12 +1,22 @@
 const base64 = require('base-64');
+const fs = require('fs');
 const chai = require('chai');
 const assert = chai.assert;
 
-const test = require('firebase-functions-test')({
-  databaseURL: 'https://airpartners-ade-test-data.firebaseio.com',
-  storageBucket: 'airpartners-ade.appspot.com',
-  projectId: 'airpartners-ade',
-}, 'test/airpartners-ade-964cc0280add.json');
+var TEST_DB_ONLINE;
+var test;
+const serviceAccountFilePath = 'test/airpartners-ade-964cc0280add.json';
+if (fs.existsSync(serviceAccountFilePath)) {
+  test = require('firebase-functions-test')({
+    databaseURL: 'https://airpartners-ade-test-data.firebaseio.com',
+    storageBucket: 'airpartners-ade.appspot.com',
+    projectId: 'airpartners-ade',
+  }, serviceAccountFilePath);
+  TEST_DB_ONLINE = true;
+} else {
+  test = require('firebase-functions-test')();
+  TEST_DB_ONLINE = false;
+}
 
 const admin = require('firebase-admin');
 
@@ -15,6 +25,9 @@ describe('Helper functions', () => {
 
   before(() => {
     utils = require('../utils');
+    if (!TEST_DB_ONLINE) {
+      console.log('WARNING: Not testing online functions because the service account file path does not exist. This is likely due to testing on a new machine or a continuous integration environment without the proper service account file.');
+    }
   });
 
   after(() => {
@@ -22,108 +35,107 @@ describe('Helper functions', () => {
     test.cleanup();
   });
 
-  describe('Online functions', () => {
-    describe('getToken', () => {
-      it('should retrieve and encode fake secret', (done) => {
-        const secretURI = 'projects/airpartners-ade/secrets/QUANTAQ_APIKEY/versions/1';
-        const expectedResult = 'Basic ' + base64.encode('test_fake_key:');
+  if (TEST_DB_ONLINE) {
+    describe('Online functions', () => {
+      describe('getToken', () => {
+        it('should retrieve and encode fake secret', (done) => {
+          const secretURI = 'projects/airpartners-ade/secrets/QUANTAQ_APIKEY/versions/1';
+          const expectedResult = 'Basic ' + base64.encode('test_fake_key:');
 
-        utils.getToken(secretURI).then((res) => {
-          assert.equal(res, expectedResult);
-          done();
-        }).catch(e => done(e));
-      });
-    });
-
-    describe('writeDataToDB', () => {
-      after(() => {
-        // Reset the database.
-        admin.database().ref('SN-00TEST').remove();
-      });
-
-      it('should remove unnecessary field, truncate geo data, fix negative values, and populate latest field', (done) => {
-        const data = {
-          data: [
-            {
-              co2: '3',
-              no2: '4',
-              pm25: -0.037,
-              timestamp: '12:07',
-              sn: 'SN-00TEST',
-              geo: {
-                lat: 42.38745,
-                lon: -71.0
-              }
-            },
-            {
-              co2: '1',
-              no2: '2',
-              pm25: 0.1,
-              timestamp: '12:08',
-              sn: 'SN-00TEST',
-              geo: {
-                lat: 42.38745,
-                lon: -71.0
-              }
-            },
-            {
-              co2: '4',
-              no2: '2',
-              pm25: 0.045,
-              timestamp: '12:09',
-              sn: 'SN-00TEST',
-              geo: {
-                lat: 42.38745,
-                lon: -71.0
-              }
-            }],
-          meta: {
-            per_page: '3'
-          }
-        };
-        const expectedResultLatest = {
-          no2: '4',
-          pm25: 0,
-          timestamp: '12:07',
-          sn: 'SN-00TEST',
-          geo: {
-            lat: 42.387,
-            lon: -71.0
-          }
-        };
-
-        utils.writeDataToDB(data).then(async () => {
-          try {
-            const createdSnap = await admin.database().ref('SN-00TEST/latest').once('value');
-            assert.deepEqual(createdSnap.val(), expectedResultLatest);
+          utils.getToken(secretURI).then((res) => {
+            assert.equal(res, expectedResult);
             done();
-          } catch (e) {
-            done(e);
-          }
+          }).catch(e => done(e));
+        });
+      });
+
+      describe('writeDataToDB', () => {
+        after(() => {
+          // Reset the database.
+          // admin.database().ref('SN-00TEST').remove();
+        });
+
+        it('should remove unnecessary field, truncate geo data, fix negative values, and populate latest field', (done) => {
+          const data = {
+            data: [
+              {
+                co2: '3',
+                no2: '4',
+                pm25: -0.037,
+                timestamp: '12:07',
+                sn: 'SN-00TEST',
+                geo: {
+                  lat: 42.38745,
+                  lon: -71.0
+                }
+              },
+              {
+                co2: '1',
+                no2: '2',
+                pm25: 0.1,
+                timestamp: '12:08',
+                sn: 'SN-00TEST',
+                geo: {
+                  lat: 42.38745,
+                  lon: -71.0
+                }
+              },
+              {
+                co2: '4',
+                no2: '2',
+                pm25: 0.045,
+                timestamp: '12:09',
+                sn: 'SN-00TEST',
+                geo: {
+                  lat: 42.38745,
+                  lon: -71.0
+                }
+              }],
+            meta: {
+              per_page: '3'
+            }
+          };
+          const expectedResultLatest = {
+            no2: '4',
+            pm25: 0,
+            timestamp: '12:07',
+            sn: 'SN-00TEST',
+            geo: {
+              lat: 42.387,
+              lon: -71.0
+            }
+          };
+
+          utils.writeDataToDB(data).then(() => {
+            admin.database().ref('SN-00TEST/latest').once('value').then(snap => {
+              assert.deepEqual(snap.val(), expectedResultLatest);
+              done();
+            }).catch(e => done(e));
+          }).catch(e => done(e));
+        });
+      });
+
+      describe('getValueFromDatabaseByRef', () => {
+        const refString = 'test';
+        const val = 0;
+
+        before(() => {
+          admin.database().ref(refString).set(val);
+        });
+
+        after(() => {
+          admin.database().ref(refString).remove();
+        });
+
+        it('should get value at the specified ref from the test db', (done) => {
+          utils.getValueFromDatabaseByRef(refString).then((res) => {
+            assert.equal(res, val);
+            done();
+          }).catch(e => done(e));
         });
       });
     });
-
-    describe('getValueFromDatabaseByRef', () => {
-      const refString = 'test';
-      const val = 0;
-
-      before(() => {
-        admin.database().ref(refString).set(val);
-      });
-
-      after(() => {
-        admin.database().ref(refString).remove();
-      });
-
-      it('should get value at the specified ref from the test db', (done) => {
-        utils.getValueFromDatabaseByRef(refString).then((res) => {
-          assert.equal(res, val);
-          done();
-        }).catch(e => done(e));
-      });
-    });
-  });
+  }
 
   describe('Offline functions', () => {
     describe('removeUnusedData', () => {
