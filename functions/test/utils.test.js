@@ -20,7 +20,7 @@ if (fs.existsSync(serviceAccountFilePath)) {
 
 const admin = require('firebase-admin');
 
-describe('Helper functions', () => {
+describe('Utils', () => {
   let utils;
 
   before(() => {
@@ -31,7 +31,6 @@ describe('Helper functions', () => {
   });
 
   after(() => {
-    // Do cleanup tasks.
     test.cleanup();
   });
 
@@ -50,66 +49,21 @@ describe('Helper functions', () => {
         });
       });
 
-      describe('writeDataToDB', () => {
+      describe('writeToDB', () => {
+        const test_sn = 'SN00-TEST';
+
         after(() => {
-          // Reset the database.
-          // admin.database().ref('SN-00TEST').remove();
+          return admin.database().ref(test_sn).remove();
         });
 
-        it('should remove unnecessary field, truncate geo data, fix negative values, and populate latest field', (done) => {
-          const data = {
-            data: [
-              {
-                co2: '3',
-                no2: '4',
-                pm25: -0.037,
-                timestamp: '12:07',
-                sn: 'SN-00TEST',
-                geo: {
-                  lat: 42.38745,
-                  lon: -71.0
-                }
-              },
-              {
-                co2: '1',
-                no2: '2',
-                pm25: 0.1,
-                timestamp: '12:08',
-                sn: 'SN-00TEST',
-                geo: {
-                  lat: 42.38745,
-                  lon: -71.0
-                }
-              },
-              {
-                co2: '4',
-                no2: '2',
-                pm25: 0.045,
-                timestamp: '12:09',
-                sn: 'SN-00TEST',
-                geo: {
-                  lat: 42.38745,
-                  lon: -71.0
-                }
-              }],
-            meta: {
-              per_page: '3'
-            }
-          };
-          const expectedResultLatest = {
-            no2: '4',
-            pm25: 0,
-            timestamp: '12:07',
-            sn: 'SN-00TEST',
-            geo: {
-              lat: 42.387,
-              lon: -71.0
-            }
-          };
+        it('should write to db', (done) => {
+          const sn = test_sn;
+          const child = 'child';
+          const val = 1;
 
-          utils.writeDataToDB(data).then(async () => {
-            const snap = await admin.database().ref('SN-00TEST/latest').once('value');
-            assert.deepEqual(snap.val(), expectedResultLatest);
+          utils.writeToDB(sn, child, val).then(async () => {
+            const snap = await admin.database().ref(`${sn}/${child}`).once('value');
+            assert.deepEqual(snap.val(), val);
             done();
             return null;
           }).catch(e => done(e));
@@ -118,18 +72,40 @@ describe('Helper functions', () => {
 
       describe('getValueFromDatabaseByRef', () => {
         const refString = 'test';
-        const val = 0;
+        const val = 1;
 
         before(() => {
-          admin.database().ref(refString).set(val);
+          return admin.database().ref(refString).set(val);
         });
 
         after(() => {
-          admin.database().ref(refString).remove();
+          return admin.database().ref(refString).remove();
         });
 
         it('should get value at the specified ref from the test db', (done) => {
           utils.getValueFromDatabaseByRef(refString).then((res) => {
+            assert.equal(res, val);
+            done();
+            return null;
+          }).catch(e => done(e));
+        });
+      });
+
+      describe('getLatestDataPointFromDB', () => {
+        const test_sn = 'SN00-TEST';
+        const refString = `${test_sn}/latest`;
+        const val = 1;
+
+        before(() => {
+          return admin.database().ref(refString).set(val);
+        });
+
+        after(() => {
+          return admin.database().ref(refString).remove();
+        });
+
+        it('should get value at latest node', (done) => {
+          utils.getLatestDataPointFromDB(test_sn).then((res) => {
             assert.equal(res, val);
             done();
             return null;
@@ -164,107 +140,48 @@ describe('Helper functions', () => {
       });
     });
 
-    describe('fixNegativePollutantConcentrations', () => {
-      it('should change negative values to 0 and ignore undefined nodes', () => {
-        const keysToFix = ['test', 'test2', 'test6'];
-        const dataPoint = {
-          test: -1,
-          test2: -2,
-          test3: -3,
-          test4: {
-            four: -4,
-            five: 5
-          }
-        };
-        const expectedResult = {
-          test: 0,
-          test2: 0,
-          test3: -3,
-          test4: {
-            four: -4,
-            five: 5
-          }
-        }
-
-        assert.deepEqual(utils.fixNegativePollutantConcentrations(dataPoint, keysToFix), expectedResult);
-      });
-    });
-
-    describe('trimGeoData', () => {
-      it('should trim geo data to 3 decimal places', () => {
-        const dataPoint = {
-          geo: {
-            lat: 32.8756,
-            lon: 5
-          }
-        };
-        const expectedResult = {
-          geo: {
-            lat: 32.876,
-            lon: 5
-          }
-        }
-
-        assert.deepEqual(utils.trimGeoData(dataPoint), expectedResult);
-      });
-
-      it('should not throw error if geo node is undefined', () => {
-        const dataPoint = {
-          test: -1,
-          test4: {
-            four: -4,
-            five: 5
-          }
-        };
-        const expectedResult = {
-          test: -1,
-          test4: {
-            four: -4,
-            five: 5
-          }
-        }
-
-        assert.deepEqual(utils.trimGeoData(dataPoint), expectedResult);
-      });
-    });
-
     describe('getEndpoint', () => {
-      it('should return specified quant-aq endpoint', () => {
-        const expectedResult = 'https://quant-aq.com/device-api/v1/devices/SN000-049/data/?page=1&per_page=10&limit=20';
+      const test_sn = 'SN00-TEST';
 
-        assert.equal(utils.getEndpoint('SN000-049', 1, 10), expectedResult);
+      it('should return default final data endpoint', () => {
+        const expectedResult = `https://quant-aq.com/device-api/v1/devices/${test_sn}/data/?page=1&per_page=1&limit=1`;
+
+        assert.equal(utils.getEndpoint(test_sn), expectedResult);
       });
-    });
 
-    describe('buildNewGraph', () => {
-      it('should add latest data point and remove old data points', () => {
-        const currentGraph = [
-          { timestamp: '2020-04-02T22:54:48' },
-          { timestamp: '2020-03-02T22:54:48' }
-        ];
-        const latestDataPoint = { timestamp: '2020-04-02T23:54:48' };
-        const expectedResult = [
-          { timestamp: '2020-04-02T23:54:48' },
-          { timestamp: '2020-04-02T22:54:48' }
-        ];
+      it('should return specified raw data endpoint', () => {
+        const page = 3;
+        const perPage = 4;
+        const limit = 5;
+        const expectedResult = `https://quant-aq.com/device-api/v1/devices/${test_sn}/data/raw/?page=${page}&per_page=${perPage}&limit=${limit}`;
 
-        assert.deepEqual(utils.buildNewGraph(currentGraph, latestDataPoint), expectedResult);
-      });
+        assert.equal(utils.getEndpoint(test_sn, true, page, perPage, limit), expectedResult);
+      })
     });
 
     describe('enoughTimePassed', () => {
       it('should return true', () => {
         const dateStringHead = '2020-04-02T23:54:48';
-        const dateStringLatest = '2020-04-03T00:10:48';
+        const dateStringLatest = '2020-04-03T00:09:48';
 
-        assert.isTrue(utils.enoughTimePassed(dateStringHead, dateStringLatest));
+        assert.isTrue(utils.enoughTimePassed(dateStringHead, dateStringLatest, 15));
       });
 
       it('should return false', () => {
         const dateStringHead = '2020-04-02T23:54:48';
         const dateStringLatest = '2020-04-02T24:08:48';
 
-        assert.isFalse(utils.enoughTimePassed(dateStringHead, dateStringLatest));
+        assert.isFalse(utils.enoughTimePassed(dateStringHead, dateStringLatest, 15));
+      });
+    });
+
+    describe('addRawDataToFinalDataPoint', () => {
+      it('should add bin0', () => {
+        const finalDataPoint = { co: 7, no: 2 };
+        const rawDataPoint = { bin0: 12, bin1: 3 };
+        const expectedResult = { co: 7, no: 2, bin0: 12 };
+
+        assert.deepEqual(utils.addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint), expectedResult);
       });
     });
   });
