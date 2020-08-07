@@ -40,30 +40,6 @@ exports.fetchQuantAQScheduled = functions.pubsub.schedule('every 10 minutes').on
 })
 
 /**
- * This function iterates through each serial number in DEVICE_LIST and clears its old
- * data from the Firebase Realtime Database. This function can be manually triggered
- * through its https endpoint.
- */
-exports.clearQuantAQ = functions.https.onRequest((request, response) => {
-  for (sn of DEVICE_LIST) {
-    console.log(`Clearing data from ${sn}`);
-    admin.database().ref(sn).child('data').set(null);
-  }
-  response.send("Running asynchronously! Data will be cleared when it is done.");
-})
-
-/**
- * A scheduled version of clearQuantAQ() which runs every 24 hours.
- */
-exports.clearQuantAQScheduled = functions.pubsub.schedule('every 24 hours').onRun((context) => {
-  for (sn of DEVICE_LIST) {
-    console.log(`Clearing data from ${sn}`);
-    admin.database().ref(sn).child('data').set(null);
-  }
-  return null;
-})
-
-/**
  * This function iterates through each serial number in DEVICE_LIST and updates
  * its graph node in the Firebase Realtime Database with the data point stored in its
  * latest node. It also removes any old data points in the graph node. This function
