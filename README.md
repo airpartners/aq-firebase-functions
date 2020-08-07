@@ -8,6 +8,10 @@
   - [Write your first function](#write-your-first-function)
   - [Test your function with the emulator](#test-your-function-with-the-emulator)
   - [Deploy your function](#deploy-your-function)
+- [Unit testing with mocha](#unit-testing-with-mocha)
+- [GitHub Workflows](#github-workflows)
+  - [Continuous integration (CI)](#continuous-integration-ci)
+  - [Continuous deployment (CD)](#continuous-deployment-cd)
 - [Adding Dependencies](#adding-dependencies)
 - [Scheduling Functions](#scheduling-functions)
   - [For an existing project](#for-an-existing-project)
@@ -78,7 +82,13 @@ exports.helloWorld = functions.https.onRequest((request, response) => {
 
 ### Test your function with the emulator
 
+NOTE: We have unit testing now! See [Unit testing with mocha](#unit-testing-with-mocha).
+NOTE: We have continuous integration now! See [Continuous integration (CI)](#continuous-integration-ci).
+Manual testing is still important though! See the following instructions for an example of how to test things with the emulators. You should always do this before pushing to test things that can't be unit tested easily.
+
 `firebase emulators:start`
+or
+`npm run serve`
 
 You should see something printed to the terminal that says:
 
@@ -100,6 +110,8 @@ You can type Ctrl^C in your terminal to stop the emulators. Some times it takes 
 
 ### Deploy your function
 
+NOTE: Deployment is handled manually now with GitHub workflows! See [Continuous deployment (CD)](#continuous-deployment-cd).
+
 `firebase deploy --only functions` to deploy all functions in index.js<br/>
 `firebase deploy --only functions:writeDB,functions:helloWorld` to deploy only writeDB and helloWorld functions<br/>
 [More info here](https://firebase.google.com/docs/functions/manage-functions)
@@ -111,6 +123,30 @@ You can now try triggering your deployed function. The url you need to enter in 
 `Function URL (helloWorld): https://us-central1-airpartners-ade.cloudfunctions.net/helloWorld`
 
 You can also find this url by going to the "Functions" page of our [Firebase Project Console](https://console.firebase.google.com/project/airpartners-ade/overview). Look for the url in the "Trigger" column of the "Dashboard" tab. After you access this url, you should see the response "Hello from Firebase!" in your browser window. If you go back to the "Functions" page mentioned above and check the "Logs" tab you should see "Hello console!" printed to the log output, sandwiched by start and finish execution messages.
+
+## Unit testing with mocha
+
+`npm run test`
+
+All unit tests are in the `./functions/test` folder. This project uses mocha with chai assertions to execute unit testing. Additionally, it uses firebase-functions-test to set up access to our test database for running online tests. In order to authenticate your access, you'll need our service account key file. The expected location of the file is in the `./functions/test` folder. If the file doesn't exist at this location, the online tests will be skipped. To get the file, log in to the adeairquality@gmail.com account and go to Google Keep. Find the note with title: airpartners-ade-964cc0280add.json. Add a file with this name and the body of the note as its contents to the `./functions/test` folder.
+
+If you have to generate a new service account key file for some reason, make sure to update all the test files to use it. You could also just rename it to match airpartners-ade-964cc0280add.json which might be better actually. We don't really need to keep track of them. We just need to make sure unauthorized people can't access them.
+
+## GitHub Workflows
+
+Go to the [Actions tab of this repository](https://github.com/airpartners/aq-firebase-functions/actions) to see all current and previous jobs, logs, and statuses.
+
+### Continuous integration (CI)
+
+Although unit tests will run automatically, it's still important to do manual testing with the emulators. See [Test your function with the emulator](#test-your-function-with-the-emulator). Additionally, use `npm run lint` locally to ensure you do not have any linter warnings or errors. GitHub workflows testing jobs will fail if there are any warnings or errors from `npm run lint`. Use `// eslint-disable-next-line` to suppress warnings or errors sparingly.
+
+Online tests do not run in GitHub workflows since, as of now, it's not clear how to include access to our service account key file without making it publicly available in our repo. See [Unit testing with mocha](#unit-testing-with-mocha) for how to get the service account key file to run online tests locally.
+
+Any time a push is made to a feature branch, the GitHub workflow at `./.github/workflows/feature.yml` will run. After installing dependencies, it will run `npm run lint` and `npm run test`. Any issues will cause a failure and prevent merging a pull request to master without using admin privileges to override this check.
+
+### Continuous deployment (CD)
+
+After any push to master (except changes that only affect README.md), the GitHub workflow at `./.github/workflows/main.yml` will run. After installing dependencies, it will run `npm run test`. Any issues will cause a failure and the changes will not be deployed. It doesn't run `npm run lint` explicitly because it is run as a part of the `firebase deploy --only functions` command before deploying.
 
 ## Adding Dependencies
 
@@ -175,7 +211,7 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 ```
 
-When calling `admin.initializeApp()` with no input, the default configuration is used. This sets the database url to https://airpartners-ade.firebaseio.com. For the credentials, it looks at the file path specified by the GOOGLE_APPLICATION_CREDENTIALS environment variable. If you want to be able to test your function locally you need to create this environment variable and set it equal to the path of your service account JSON file. This should be a non-relative local path. To download the file, go the to the [Firebase Project Console](https://console.firebase.google.com/project/airpartners-ade/overview). Click the Settings (gear icon) button next to "Project Overview" in the top left. Select "Users and Permissions" then go to the "Service accounts" tab. Click "Generate new private key" and follow the instructions. After the download is complete, add something like the following to your .bashrc or equivalent so the environment variable will always exist.
+When calling `admin.initializeApp()` with no input, the default configuration is used. This sets the database url to https://airpartners-ade.firebaseio.com. For the credentials, it looks at the file path specified by the GOOGLE_APPLICATION_CREDENTIALS environment variable. If you want to be able to test your function locally you need to create this environment variable and set it equal to the path of your service account JSON file. This should be a non-relative local path. To download the file, go the to the [Firebase Project Console](https://console.firebase.google.com/project/airpartners-ade/overview). Click the Settings (gear icon) button next to "Project Overview" in the top left. Select "Users and Permissions" then go to the "Service accounts" tab. Click "Generate new private key" and follow the instructions. After the download is complete, add something like the following to your .bashrc or equivalent so the environment variable will always exist. You can also use the existing service account key file by logging into the adeairquality@gmail.com account and going to Google Keep. There should be a note title serviceAccountKey.json.
 
 `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/local/service/account/.json"`
 
@@ -219,7 +255,7 @@ You can deploy environment variables with a function but the [guide](https://clo
 
 #### Creating a secret
 
-[Creating and accessing secrets](https://cloud.google.com/secret-manager/docs/creating-and-accessing-secrets)
+Docs: [Creating and accessing secrets](https://cloud.google.com/secret-manager/docs/creating-and-accessing-secrets)
 
 In the docs linked above, it's pretty simple to figure out how to create a secret using the Web UI. Make sure you're logged in to the adeairquality@gmail.com account in the Google Cloud Console and you're in the airpartners-ade project.
 
