@@ -68,9 +68,7 @@ exports.trimGeoData = trimGeoData; // for tests
  * @param {object} rawDataPoint the latest raw data point
  */
 restructureData = (finalDataPoint, rawDataPoint) => {
-  if (finalDataPoint.timestamp === rawDataPoint.timestamp) {
-    finalDataPoint = addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint);
-  }
+  finalDataPoint = addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint);
   finalDataPoint = removeUnusedData(finalDataPoint);
   finalDataPoint = fixNegativePollutantConcentrations(finalDataPoint);
   finalDataPoint = trimGeoData(finalDataPoint);

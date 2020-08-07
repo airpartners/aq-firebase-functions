@@ -144,12 +144,12 @@ describe('Latest node helper functions', () => {
         assert.deepEqual(functions.restructureData(final, raw), expectedResult);
       });
 
-      it('should not add raw data', () => {
+      it('should add raw data in lastRaw node', () => {
         const geo = { lat: 1.333, lon: 5 };
         const timestamp = '2020-04-02T23:54:48';
         const final = { timestamp: timestamp, geo: geo };
-        const raw = { bin0: 1, timestamp: '2020-04-02T23:54:49' };
-        const expectedResult = { timestamp: timestamp, geo: geo };
+        const raw = { bin0: 1, timestamp: '2020-04-02T23:54:49', timestamp_local: '2020-04-02T23:54:49' };
+        const expectedResult = { timestamp: timestamp, geo: geo, lastRaw: raw };
         assert.deepEqual(functions.restructureData(final, raw), expectedResult);
       });
     });

@@ -76,8 +76,8 @@ addRawDataToGraph = async (token, sn, graph) => {
         doesNeedRawData = false;
       } else if ((quantaqData[quantaqData.length - 1].timestamp - graphDataPointDate) > 0) {
         if (nextEndpoint && (numRequests < maxRequests)) {
-          // eslint-disable-next-line
           console.log(`${sn}: Request number ${numRequests}.`)
+          // eslint-disable-next-line
           response = await fetchQuantAQData(token, nextEndpoint);
           numRequests = numRequests + 1;
           quantaqData = response.data;

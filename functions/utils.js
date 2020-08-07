@@ -15,7 +15,7 @@ const PASSWORD = ""; // no password required for now
 
 const RAW_KEYS = ['bin0'];
 const POLLUTANT_KEYS = RAW_KEYS.concat(['co', 'no2', 'o3', 'pm25', 'no']); // to check for negative values
-const GRAPH_NODE_KEYS = POLLUTANT_KEYS.concat(['sn', 'timestamp', 'timestamp_local']);
+const GRAPH_NODE_KEYS = POLLUTANT_KEYS.concat(['sn', 'timestamp', 'timestamp_local', 'lastRaw']);
 const LATEST_NODE_KEYS = GRAPH_NODE_KEYS.concat(['rh_manifold', 'temp_manifold', 'wind_dir', 'wind_speed', 'geo']);
 exports.RAW_KEYS = RAW_KEYS;
 exports.POLLUTANT_KEYS = POLLUTANT_KEYS;
@@ -110,16 +110,28 @@ exports.enoughTimePassed = enoughTimePassed;
 
 /**
  * Adds raw keys from raw data point to a data point with final data
- * @param {object} finalDataPoint the final data point to add the raw data to
- * @param {object} rawDataPoint the raw data point to get the raw data from
+ * @param {object} final the final data point to add the raw data to
+ * @param {object} raw the raw data point to get the raw data from
  */
-addRawDataToFinalDataPoint = (finalDataPoint, rawDataPoint) => {
+addRawDataToFinalDataPoint = (final, raw) => {
+  let raws = {}
   for (key of RAW_KEYS) {
-    if (typeof rawDataPoint[key] !== 'undefined') {
-      finalDataPoint[key] = rawDataPoint[key];
+    if (typeof raw[key] !== 'undefined') {
+      raws[key] = raw[key];
     }
   }
-  return finalDataPoint;
+  if (final.timestamp === raw.timestamp) {
+    final = { ...final, ...raws };
+  } else {
+    timestamp = (typeof raw.timestamp === 'undefined') ? null : raw.timestamp;
+    timestamp_local = (typeof raw.timestamp_local === 'undefined') ? null : raw.timestamp_local;
+    final['lastRaw'] = {
+      ...raws,
+      timestamp: timestamp,
+      timestamp_local: timestamp_local
+    };
+  }
+  return final;
 }
 exports.addRawDataToFinalDataPoint = addRawDataToFinalDataPoint;
 

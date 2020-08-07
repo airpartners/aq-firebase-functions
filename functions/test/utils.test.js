@@ -177,9 +177,21 @@ describe('Utils', () => {
 
     describe('addRawDataToFinalDataPoint', () => {
       it('should add bin0', () => {
-        const finalDataPoint = { co: 7, no: 2 };
-        const rawDataPoint = { bin0: 12, bin1: 3 };
-        const expectedResult = { co: 7, no: 2, bin0: 12 };
+        const timestamp = '2020-04-02T23:54:48';
+        const finalDataPoint = { co: 7, no: 2, timestamp: timestamp };
+        const rawDataPoint = { bin0: 12, bin1: 3, timestamp: timestamp };
+        const expectedResult = { co: 7, no: 2, bin0: 12, timestamp: timestamp };
+
+        assert.deepEqual(utils.addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint), expectedResult);
+      });
+
+      it('should add lastRaw node', () => {
+        const timestamp = '2020-04-02T23:54:48';
+        const finalDataPoint = { co: 7, no: 2, timestamp: timestamp };
+        const rawDataPoint = { bin0: 12, timestamp: '2020-04-02T23:54:47' };
+        const expectedResult = {
+          co: 7, no: 2, timestamp: timestamp, lastRaw: { ...rawDataPoint, timestamp_local: null }
+        };
 
         assert.deepEqual(utils.addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint), expectedResult);
       });
