@@ -1,6 +1,8 @@
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
-const { getDataAndWriteToDB, updateGraphNode } = require('./utils');
+const { getToken } = require('./utils');
+const { updateGraphNode } = require('./graphNodeHelpers');
+const { getDataAndWriteToDB } = require('./latestNodeHelpers');
 
 const DEVICE_LIST = ['SN000-045', 'SN000-046', 'SN000-049', 'SN000-062', 'SN000-067', 'SN000-072'];
 
@@ -12,9 +14,13 @@ const DEVICE_LIST = ['SN000-045', 'SN000-046', 'SN000-049', 'SN000-062', 'SN000-
  * Quant-AQ. This function can be manually triggered through its https endpoint.
  */
 exports.fetchQuantAQ = functions.https.onRequest((request, response) => {
-  for (sn of DEVICE_LIST) {
-    getDataAndWriteToDB(sn);
-  }
+  getToken()
+    .then(token => {
+      for (sn of DEVICE_LIST) {
+        getDataAndWriteToDB(token, sn);
+      }
+      return null;
+    }).catch(e => console.log(e));
   response.send("Fetch is running asynchronously! The data will be in the database when it's done.");
 })
 
@@ -23,33 +29,13 @@ exports.fetchQuantAQ = functions.https.onRequest((request, response) => {
  */
 exports.fetchQuantAQScheduled = functions.pubsub.schedule('every 10 minutes').onRun((context) => {
   console.log("Fetching data from QuantAQ and writing to DB");
-  for (sn of DEVICE_LIST) {
-    getDataAndWriteToDB(sn);
-  }
-  return null;
-})
-
-/**
- * This function iterates through each serial number in DEVICE_LIST and clears its old
- * data from the Firebase Realtime Database. This function can be manually triggered
- * through its https endpoint.
- */
-exports.clearQuantAQ = functions.https.onRequest((request, response) => {
-  for (sn of DEVICE_LIST) {
-    console.log(`Clearing data from ${sn}`);
-    admin.database().ref(sn).child('data').set(null);
-  }
-  response.send("Running asynchronously! Data will be cleared when it is done.");
-})
-
-/**
- * A scheduled version of clearQuantAQ() which runs every 24 hours.
- */
-exports.clearQuantAQScheduled = functions.pubsub.schedule('every 24 hours').onRun((context) => {
-  for (sn of DEVICE_LIST) {
-    console.log(`Clearing data from ${sn}`);
-    admin.database().ref(sn).child('data').set(null);
-  }
+  getToken()
+    .then(token => {
+      for (sn of DEVICE_LIST) {
+        getDataAndWriteToDB(token, sn);
+      }
+      return null;
+    }).catch(e => console.log(e));
   return null;
 })
 
@@ -60,9 +46,13 @@ exports.clearQuantAQScheduled = functions.pubsub.schedule('every 24 hours').onRu
  * can be manually triggered through its https endpoint.
  */
 exports.updateGraphNodes = functions.https.onRequest((request, response) => {
-  for (sn of DEVICE_LIST) {
-    updateGraphNode(sn);
-  }
+  getToken()
+    .then(token => {
+      for (sn of DEVICE_LIST) {
+        updateGraphNode(token, sn);
+      }
+      return null;
+    }).catch(e => console.log(e));
   response.send("Graph nodes updating asynchronously. See logs for progress.");
 })
 
@@ -72,5 +62,7 @@ exports.updateGraphNodes = functions.https.onRequest((request, response) => {
 exports.updateGraphNodeListener = functions.database.ref('{sn}/latest')
   .onUpdate((change, context) => {
     const sn = context.params.sn;
-    return updateGraphNode(sn);
+    return getToken()
+      .then(token => updateGraphNode(token, sn))
+      .catch(e => console.log(e));
   })
