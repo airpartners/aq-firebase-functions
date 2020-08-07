@@ -68,13 +68,15 @@ addRawDataToGraph = async (token, sn, graph) => {
   let numRequests = 1;
   let quantaqData = response.data;
   let nextEndpoint = response.meta.next_url;
+  let headDate = new Date(quantaqData[0].timestamp);
+  let tailDate = new Date(quantaqData[quantaqData.length - 1].timestamp);
   for (let graphDataPoint of graph) {
     let doesNeedRawData = needsRawData(graphDataPoint);
     const graphDataPointDate = new Date(graphDataPoint.timestamp);
     while (doesNeedRawData) {
-      if ((graphDataPointDate - quantaqData[0].timestamp) > 0) {
+      if ((graphDataPointDate - headDate) > 0) {
         doesNeedRawData = false;
-      } else if ((quantaqData[quantaqData.length - 1].timestamp - graphDataPointDate) > 0) {
+      } else if ((tailDate - graphDataPointDate) > 0) {
         if (nextEndpoint && (numRequests < maxRequests)) {
           console.log(`${sn}: Request number ${numRequests}.`)
           // eslint-disable-next-line
@@ -82,6 +84,8 @@ addRawDataToGraph = async (token, sn, graph) => {
           numRequests = numRequests + 1;
           quantaqData = response.data;
           nextEndpoint = response.meta.next_url;
+          headDate = new Date(quantaqData[0].timestamp);
+          tailDate = new Date(quantaqData[quantaqData.length - 1].timestamp);
         } else {
           doesNeedRawData = false;
         }
@@ -122,9 +126,13 @@ exports.updateGraphNode = async (token, sn) => {
     const graphFromDB = await getGraphFromDB(sn);
     if (Array.isArray(graphFromDB)) {
       const updatedGraph = buildNewGraph(graphFromDB, latestDataPoint);
-      const graphToWrite = await addRawDataToGraph(token, sn, updatedGraph);
-      return writeGraphToDB(sn, graphToWrite);
-      // return writeGraphToDB(sn, updatedGraph);
+      try {
+        const graphToWrite = await addRawDataToGraph(token, sn, updatedGraph);
+        return writeGraphToDB(sn, graphToWrite);
+      } catch (e) {
+        console.log(e);
+        return writeGraphToDB(sn, updatedGraph);
+      }
     } else {
       return writeGraphToDB(sn, [latestDataPoint]);
     }
