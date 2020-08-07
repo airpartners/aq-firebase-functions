@@ -136,17 +136,19 @@ If you have to generate a new service account key file for some reason, make sur
 
 Go to the [Actions tab of this repository](https://github.com/airpartners/aq-firebase-functions/actions) to see all current and previous jobs, logs, and statuses.
 
+It is highly recommended to run `npm test` and `npm run lint`, before pushing to any branch. Otherwise, CI/CD workflows may fail unexpectedly causing you to add a fixing commit.
+
 ### Continuous integration (CI)
 
 Although unit tests will run automatically, it's still important to do manual testing with the emulators. See [Test your function with the emulator](#test-your-function-with-the-emulator). Additionally, use `npm run lint` locally to ensure you do not have any linter warnings or errors. GitHub workflows testing jobs will fail if there are any warnings or errors from `npm run lint`. Use `// eslint-disable-next-line` to suppress warnings or errors sparingly.
 
 Online tests do not run in GitHub workflows since, as of now, it's not clear how to include access to our service account key file without making it publicly available in our repo. See [Unit testing with mocha](#unit-testing-with-mocha) for how to get the service account key file to run online tests locally.
 
-Any time a push is made to a feature branch, the GitHub workflow at `./.github/workflows/feature.yml` will run. After installing dependencies, it will run `npm run lint` and `npm run test`. Any issues will cause a failure and prevent merging a pull request to master without using admin privileges to override this check.
+Any time a push is made to a feature branch, the GitHub workflow at `./.github/workflows/feature.yml` will run. After installing dependencies, it will run `npm run lint` and `npm test`. Any issues will cause a failure and prevent merging a pull request to master without using admin privileges to override this check. To view and/or edit these branch protection settings go to [Setting > Branches](https://github.com/airpartners/aq-firebase-functions/settings/branches).
 
 ### Continuous deployment (CD)
 
-After any push to master (except changes that only affect README.md), the GitHub workflow at `./.github/workflows/main.yml` will run. After installing dependencies, it will run `npm run test`. Any issues will cause a failure and the changes will not be deployed. It doesn't run `npm run lint` explicitly because it is run as a part of the `firebase deploy --only functions` command before deploying.
+After any push to master (except changes that only affect README.md), the GitHub workflow at `./.github/workflows/main.yml` will run. After installing dependencies, it will run `npm test`. Any issues will cause a failure and the changes will not be deployed. It doesn't run `npm run lint` explicitly because it is run as a part of the `firebase deploy --only functions` command before deploying.
 
 ## Adding Dependencies
 
