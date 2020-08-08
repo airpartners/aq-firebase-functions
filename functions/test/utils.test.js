@@ -208,7 +208,7 @@ describe('Utils', () => {
       const test_sn = 'SN00-TEST';
 
       it('should return default final data endpoint', () => {
-        const expectedResult = `https://quant-aq.com/device-api/v1/devices/${test_sn}/data/?page=1&per_page=1&limit=1`;
+        const expectedResult = `https://quant-aq.com/device-api/v1/devices/${test_sn}/data/?page=1&per_page=1&limit=1&sort=timestamp,desc`;
 
         assert.equal(functions.getEndpoint(test_sn), expectedResult);
       });
@@ -217,7 +217,7 @@ describe('Utils', () => {
         const page = 3;
         const perPage = 4;
         const limit = 5;
-        const expectedResult = `https://quant-aq.com/device-api/v1/devices/${test_sn}/data/raw/?page=${page}&per_page=${perPage}&limit=${limit}`;
+        const expectedResult = `https://quant-aq.com/device-api/v1/devices/${test_sn}/data/raw/?page=${page}&per_page=${perPage}&limit=${limit}&sort=timestamp,desc`;
 
         assert.equal(functions.getEndpoint(test_sn, true, page, perPage, limit), expectedResult);
       })

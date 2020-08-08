@@ -65,11 +65,7 @@ exports.getLatestDataPointFromDB = getLatestDataPointFromDB;
  * for sequential requests if pagination is needed)
  */
 getEndpoint = (sn = 'SN000-072', raw = false, page = 1, perPage = 1, limit = 1) => {
-  if (raw) {
-    return `${BASE_URL}/${sn}/data/raw/?page=${page}&per_page=${perPage}&limit=${limit}`
-  } else {
-    return `${BASE_URL}/${sn}/data/?page=${page}&per_page=${perPage}&limit=${limit}`
-  }
+  return `${BASE_URL}/${sn}/data/${raw ? 'raw/' : ''}?page=${page}&per_page=${perPage}&limit=${limit}&sort=timestamp,desc`
 }
 exports.getEndpoint = getEndpoint;
 

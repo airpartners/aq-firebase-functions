@@ -126,6 +126,8 @@ You can also find this url by going to the "Functions" page of our [Firebase Pro
 
 ## Unit testing with mocha
 
+NOTE: Make sure you are in the `./functions` folder.
+
 `npm run test`
 
 All unit tests are in the `./functions/test` folder. This project uses mocha with chai assertions to execute unit testing. Additionally, it uses firebase-functions-test to set up access to our test database for running online tests. In order to authenticate your access, you'll need our service account key file. The expected location of the file is in the `./functions/test` folder. If the file doesn't exist at this location, the online tests will be skipped. To get the file, log in to the adeairquality@gmail.com account and go to Google Keep. Find the note with title: airpartners-ade-964cc0280add.json. Add a file with this name and the body of the note as its contents to the `./functions/test` folder.
@@ -136,7 +138,7 @@ If you have to generate a new service account key file for some reason, make sur
 
 Go to the [Actions tab of this repository](https://github.com/airpartners/aq-firebase-functions/actions) to see all current and previous jobs, logs, and statuses.
 
-It is highly recommended to run `npm test` and `npm run lint`, before pushing to any branch. Otherwise, CI/CD workflows may fail unexpectedly causing you to add a fixing commit.
+It is highly recommended to run `npm test` and `npm run lint`, before pushing to any branch. Otherwise, CI/CD workflows may fail unexpectedly causing you to add a fixing commit. NOTE: Make sure you are in the `./functions` folder when running these commands.
 
 ### Continuous integration (CI)
 
@@ -151,6 +153,8 @@ Any time a push is made to a feature branch, the GitHub workflow at `./.github/w
 After any push to master (except changes that only affect README.md), the GitHub workflow at `./.github/workflows/main.yml` will run. After installing dependencies, it will run `npm test`. Any issues will cause a failure and the changes will not be deployed. It doesn't run `npm run lint` explicitly because it is run as a part of the `firebase deploy --only functions` command before deploying.
 
 ## Adding Dependencies
+
+NOTE: Make sure you are in the `./functions` folder before running `npm install`.
 
 Here is an example with the `npm` package `base-64`.
 
