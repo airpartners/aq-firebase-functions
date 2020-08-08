@@ -1,6 +1,7 @@
 const { enoughTimePassed, fetchQuantAQData, getEndpoint,
   getValueFromDatabaseByRef, addRawDataToFinalDataPoint,
-  writeToDB, removeUnusedData, RAW_KEYS, GRAPH_NODE_KEYS } = require("./utils");
+  writeToDB, removeUnusedData, fixNegativePollutantConcentrations,
+  trimGeoData, RAW_KEYS, GRAPH_NODE_KEYS } = require("./utils");
 
 /**
  * Get graph node from Firebase realtime db
@@ -39,6 +40,76 @@ buildNewGraph = (currentGraph, latestDataPoint) => {
 exports.buildNewGraph = buildNewGraph; // for tests
 
 /**
+ * Tries to fill in any missing graph points (when quant aq data wasn't up to date)
+ * @param {string} token the encoded token to authenticate the request
+ * @param {string} sn the device serial number
+ * @param {array} graph the graph to check and update as needed/possible
+ */
+addMissingGraphPoints = async (token, sn, graph) => {
+  console.log(`${sn}: Trying to add missing graph points if needed.`);
+
+  if (graph.length >= 2) {
+    // split graph
+    let newGraph = [];
+    newGraph.push(graph.shift());
+    const prevPoint = graph[0];
+    const prevPointDate = new Date(prevPoint.timestamp);
+
+    if (enoughTimePassed(prevPoint.timestamp, newGraph[0].timestamp, 30)) {
+      // gap exists, start looking for data
+      let missingDataMayExist = true;
+      let nextPoint = newGraph[0];
+
+      const perPage = 100;
+      const limit = 1400;
+      const maxRequests = limit / perPage;
+      let response = await fetchQuantAQData(token, getEndpoint(sn, false, 1, perPage, limit));
+      let numRequests = 1;
+      let quantaqData = response.data;
+      let nextEndpoint = response.meta.next_url;
+      let headDate = new Date(quantaqData[0].timestamp);
+
+      while (missingDataMayExist && enoughTimePassed(prevPoint.timestamp, nextPoint.timestamp, 30)) {
+        if ((prevPointDate - headDate) >= 0) {
+          missingDataMayExist = false;
+        } else {
+          let foundPoint = false;
+          for (let quantaqDataPoint of quantaqData) {
+            if (enoughTimePassed(quantaqDataPoint.timestamp, nextPoint.timestamp, 20)
+              && enoughTimePassed(prevPoint.timestamp, quantaqDataPoint.timestamp, 10)) {
+              foundPoint = true;
+              quantaqDataPoint = removeUnusedData(quantaqDataPoint, GRAPH_NODE_KEYS);
+              quantaqDataPoint = fixNegativePollutantConcentrations(quantaqDataPoint);
+              quantaqDataPoint = trimGeoData(quantaqDataPoint);
+              newGraph.push(quantaqDataPoint);
+              nextPoint = quantaqDataPoint;
+              break;
+            }
+          }
+          if (!foundPoint) {
+            if (nextEndpoint && (numRequests < maxRequests)) {
+              numRequests = numRequests + 1;
+              console.log(`${sn} adding graph points: Request number ${numRequests}.`)
+              // eslint-disable-next-line
+              response = await fetchQuantAQData(token, nextEndpoint);
+              quantaqData = response.data;
+              nextEndpoint = response.meta.next_url;
+              headDate = new Date(quantaqData[0].timestamp);
+            } else {
+              missingDataMayExist = false;
+            }
+          }
+        }
+      }
+
+    }
+
+    return newGraph.concat(graph);
+  }
+  return graph;
+}
+
+/**
  * Checks if any raw data keys are missing from the data point
  * @param {object} dataPoint the data point to check
  */
@@ -59,7 +130,7 @@ exports.needsRawData = needsRawData; // for tests
  * @param {array} graph the graph to check and update as needed/possible
  */
 addRawDataToGraph = async (token, sn, graph) => {
-  console.log(`${sn}: Trying to add raw data to graph if neeed.`);
+  console.log(`${sn}: Trying to add raw data to graph if needed.`);
   let newGraph = [];
   const perPage = 100;
   const limit = 1400;
@@ -78,10 +149,10 @@ addRawDataToGraph = async (token, sn, graph) => {
         doesNeedRawData = false;
       } else if ((tailDate - graphDataPointDate) > 0) {
         if (nextEndpoint && (numRequests < maxRequests)) {
-          console.log(`${sn}: Request number ${numRequests}.`)
+          numRequests = numRequests + 1;
+          console.log(`${sn} adding raw data: Request number ${numRequests}.`)
           // eslint-disable-next-line
           response = await fetchQuantAQData(token, nextEndpoint);
-          numRequests = numRequests + 1;
           quantaqData = response.data;
           nextEndpoint = response.meta.next_url;
           headDate = new Date(quantaqData[0].timestamp);
@@ -127,7 +198,8 @@ exports.updateGraphNode = async (token, sn) => {
     if (Array.isArray(graphFromDB)) {
       const updatedGraph = buildNewGraph(graphFromDB, latestDataPoint);
       try {
-        const graphToWrite = await addRawDataToGraph(token, sn, updatedGraph);
+        const fullGraph = await addMissingGraphPoints(token, sn, updatedGraph)
+        const graphToWrite = await addRawDataToGraph(token, sn, fullGraph);
         return writeGraphToDB(sn, graphToWrite);
       } catch (e) {
         console.log(e);

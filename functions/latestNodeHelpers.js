@@ -1,6 +1,7 @@
 const { fetchQuantAQData, getEndpoint, enoughTimePassed,
   addRawDataToFinalDataPoint, removeUnusedData, writeToDB,
-  getLatestDataPointFromDB, POLLUTANT_KEYS } = require("./utils");
+  getLatestDataPointFromDB, fixNegativePollutantConcentrations,
+  trimGeoData } = require("./utils");
 
 /**
  * Fetch the most recent final data point from quantAQ
@@ -33,33 +34,6 @@ newDataIsAvailable = (head, latest) => {
   return enoughTimePassed(head.timestamp, latest.timestamp, 1);
 }
 exports.newDataIsAvailable = newDataIsAvailable; // for tests
-
-/**
- * Rounds any negative pollutant concentrations up to 0
- * @param {object} dataPoint the data point to be fixed
- */
-fixNegativePollutantConcentrations = (dataPoint, keysToFix = POLLUTANT_KEYS) => {
-  for (key of keysToFix) {
-    if (typeof dataPoint[key] !== 'undefined') {
-      dataPoint[key] = (dataPoint[key] < 0) ? 0 : dataPoint[key];
-    }
-  }
-  return dataPoint;
-}
-exports.fixNegativePollutantConcentrations = fixNegativePollutantConcentrations; // for tests
-
-/**
- * Reduces lat/long specificity to 3 decimal places
- * @param {object} dataPoint the data point to be fixed
- */
-trimGeoData = (dataPoint) => {
-  if (dataPoint.geo) {
-    dataPoint.geo.lat = parseFloat(Number(dataPoint.geo.lat).toFixed(3));
-    dataPoint.geo.lon = parseFloat(Number(dataPoint.geo.lon).toFixed(3));
-  }
-  return dataPoint;
-}
-exports.trimGeoData = trimGeoData; // for tests
 
 /**
  * Returns the data point after adding raw data, removing unused data,

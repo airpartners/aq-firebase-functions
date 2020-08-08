@@ -21,10 +21,10 @@ if (fs.existsSync(serviceAccountFilePath)) {
 const admin = require('firebase-admin');
 
 describe('Utils', () => {
-  let utils;
+  let functions;
 
   before(() => {
-    utils = require('../utils');
+    functions = require('../utils');
     if (!TEST_DB_ONLINE) {
       console.log('WARNING: Not testing online functions because the service account file path does not exist. This is likely due to testing on a new machine or a continuous integration environment without the proper service account file.');
     }
@@ -41,7 +41,7 @@ describe('Utils', () => {
           const secretURI = 'projects/airpartners-ade/secrets/QUANTAQ_APIKEY/versions/1';
           const expectedResult = 'Basic ' + base64.encode('test_fake_key:');
 
-          utils.getToken(secretURI).then((res) => {
+          functions.getToken(secretURI).then((res) => {
             assert.equal(res, expectedResult);
             done();
             return null;
@@ -61,7 +61,7 @@ describe('Utils', () => {
           const child = 'child';
           const val = 1;
 
-          utils.writeToDB(sn, child, val).then(async () => {
+          functions.writeToDB(sn, child, val).then(async () => {
             const snap = await admin.database().ref(`${sn}/${child}`).once('value');
             assert.deepEqual(snap.val(), val);
             done();
@@ -83,7 +83,7 @@ describe('Utils', () => {
         });
 
         it('should get value at the specified ref from the test db', (done) => {
-          utils.getValueFromDatabaseByRef(refString).then((res) => {
+          functions.getValueFromDatabaseByRef(refString).then((res) => {
             assert.equal(res, val);
             done();
             return null;
@@ -105,7 +105,7 @@ describe('Utils', () => {
         });
 
         it('should get value at latest node', (done) => {
-          utils.getLatestDataPointFromDB(test_sn).then((res) => {
+          functions.getLatestDataPointFromDB(test_sn).then((res) => {
             assert.equal(res, val);
             done();
             return null;
@@ -136,7 +136,71 @@ describe('Utils', () => {
           }
         }
 
-        assert.deepEqual(utils.removeUnusedData(dataPoint, keysToKeep), expectedResult);
+        assert.deepEqual(functions.removeUnusedData(dataPoint, keysToKeep), expectedResult);
+      });
+    });
+
+    describe('fixNegativePollutantConcentrations', () => {
+      it('should change negative values to 0 and ignore undefined nodes', () => {
+        const keysToFix = ['test', 'test2', 'test6'];
+        const dataPoint = {
+          test: -1,
+          test2: -2,
+          test3: -3,
+          test4: {
+            four: -4,
+            five: 5
+          }
+        };
+        const expectedResult = {
+          test: 0,
+          test2: 0,
+          test3: -3,
+          test4: {
+            four: -4,
+            five: 5
+          }
+        }
+
+        assert.deepEqual(functions.fixNegativePollutantConcentrations(dataPoint, keysToFix), expectedResult);
+      });
+    });
+
+    describe('trimGeoData', () => {
+      it('should trim geo data to 3 decimal places', () => {
+        const dataPoint = {
+          geo: {
+            lat: 32.8756,
+            lon: 5
+          }
+        };
+        const expectedResult = {
+          geo: {
+            lat: 32.876,
+            lon: 5
+          }
+        }
+
+        assert.deepEqual(functions.trimGeoData(dataPoint), expectedResult);
+      });
+
+      it('should not throw error if geo node is undefined', () => {
+        const dataPoint = {
+          test: -1,
+          test4: {
+            four: -4,
+            five: 5
+          }
+        };
+        const expectedResult = {
+          test: -1,
+          test4: {
+            four: -4,
+            five: 5
+          }
+        }
+
+        assert.deepEqual(functions.trimGeoData(dataPoint), expectedResult);
       });
     });
 
@@ -146,7 +210,7 @@ describe('Utils', () => {
       it('should return default final data endpoint', () => {
         const expectedResult = `https://quant-aq.com/device-api/v1/devices/${test_sn}/data/?page=1&per_page=1&limit=1`;
 
-        assert.equal(utils.getEndpoint(test_sn), expectedResult);
+        assert.equal(functions.getEndpoint(test_sn), expectedResult);
       });
 
       it('should return specified raw data endpoint', () => {
@@ -155,7 +219,7 @@ describe('Utils', () => {
         const limit = 5;
         const expectedResult = `https://quant-aq.com/device-api/v1/devices/${test_sn}/data/raw/?page=${page}&per_page=${perPage}&limit=${limit}`;
 
-        assert.equal(utils.getEndpoint(test_sn, true, page, perPage, limit), expectedResult);
+        assert.equal(functions.getEndpoint(test_sn, true, page, perPage, limit), expectedResult);
       })
     });
 
@@ -164,14 +228,14 @@ describe('Utils', () => {
         const dateStringHead = '2020-04-02T23:54:48';
         const dateStringLatest = '2020-04-03T00:09:48';
 
-        assert.isTrue(utils.enoughTimePassed(dateStringHead, dateStringLatest, 15));
+        assert.isTrue(functions.enoughTimePassed(dateStringHead, dateStringLatest, 15));
       });
 
       it('should return false', () => {
         const dateStringHead = '2020-04-02T23:54:48';
         const dateStringLatest = '2020-04-02T24:08:48';
 
-        assert.isFalse(utils.enoughTimePassed(dateStringHead, dateStringLatest, 15));
+        assert.isFalse(functions.enoughTimePassed(dateStringHead, dateStringLatest, 15));
       });
     });
 
@@ -182,7 +246,7 @@ describe('Utils', () => {
         const rawDataPoint = { bin0: 12, bin1: 3, timestamp: timestamp };
         const expectedResult = { co: 7, no: 2, bin0: 12, timestamp: timestamp };
 
-        assert.deepEqual(utils.addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint), expectedResult);
+        assert.deepEqual(functions.addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint), expectedResult);
       });
 
       it('should add lastRaw node', () => {
@@ -193,7 +257,7 @@ describe('Utils', () => {
           co: 7, no: 2, timestamp: timestamp, lastRaw: { ...rawDataPoint, timestamp_local: null }
         };
 
-        assert.deepEqual(utils.addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint), expectedResult);
+        assert.deepEqual(functions.addRawDataToFinalDataPoint(finalDataPoint, rawDataPoint), expectedResult);
       });
     });
   });

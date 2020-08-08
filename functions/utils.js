@@ -152,6 +152,33 @@ removeUnusedData = (dataPoint, keysToKeep = LATEST_NODE_KEYS) => {
 exports.removeUnusedData = removeUnusedData;
 
 /**
+ * Rounds any negative pollutant concentrations up to 0
+ * @param {object} dataPoint the data point to be fixed
+ */
+fixNegativePollutantConcentrations = (dataPoint, keysToFix = POLLUTANT_KEYS) => {
+  for (key of keysToFix) {
+    if (typeof dataPoint[key] !== 'undefined') {
+      dataPoint[key] = (dataPoint[key] < 0) ? 0 : dataPoint[key];
+    }
+  }
+  return dataPoint;
+}
+exports.fixNegativePollutantConcentrations = fixNegativePollutantConcentrations;
+
+/**
+ * Reduces lat/long specificity to 3 decimal places
+ * @param {object} dataPoint the data point to be fixed
+ */
+trimGeoData = (dataPoint) => {
+  if (dataPoint.geo) {
+    dataPoint.geo.lat = parseFloat(Number(dataPoint.geo.lat).toFixed(3));
+    dataPoint.geo.lon = parseFloat(Number(dataPoint.geo.lon).toFixed(3));
+  }
+  return dataPoint;
+}
+exports.trimGeoData = trimGeoData;
+
+/**
  * Write something to the Firebase realtime db
  * @param {string} sn the device serial number
  * @param {string} child the child node of the device to write to
