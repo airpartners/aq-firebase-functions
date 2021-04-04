@@ -4,7 +4,7 @@ const { getToken } = require('./utils');
 const { updateGraphNode } = require('./graphNodeHelpers');
 const { getDataAndWriteToDB } = require('./latestNodeHelpers');
 
-const DEVICE_LIST = ['SN000-045', 'SN000-046', 'SN000-049', 'SN000-062', 'SN000-067', 'SN000-072'];
+const DEVICE_LIST = ['SN000-045', 'SN000-046', 'SN000-049', 'SN000-062', 'SN000-067', 'SN000-072', 'SN000-114'];
 
 
 /*************** FIREBASE CLOUD FUNCTIONS ***********************/
