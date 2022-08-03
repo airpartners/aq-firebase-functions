@@ -10,7 +10,7 @@ const secretManagerServiceClient = new SecretManagerServiceClient();
 const SECRET_URI = 'projects/airpartners-ade/secrets/QUANTAQ_APIKEY/versions/latest';
 
 // Quant-AQ request parameters
-const BASE_URL = "https://quant-aq.com/device-api/v1/devices";
+const BASE_URL = "https://api.quant-aq.com/device-api/v1/devices";
 const PASSWORD = ""; // no password required for now
 
 const RAW_KEYS = ['bin0'];
